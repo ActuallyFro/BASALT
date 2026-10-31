@@ -2,7 +2,7 @@
 <#
   llms-tree MEGA MANIFEST & LPG WEBAPP CONVERTER (PowerShell 5.1 Compatible)
   Rolls up every <chunk>\llms-manifest.json into:
-    - mega-manifest.json  (LPG Webapp Graph JSON format)
+    - mega-manifest.json  (LPG Webapp Graph JSON format with Tiered Depth Coloring)
     - mega-manifest.jsonl (line-by-line JSON nodes)
     - nodes.csv, edges.csv (LPG-style imports)
     - mega-catalog.md     (VS Code readable markdown catalogue)
@@ -17,12 +17,16 @@ $LlmsFileName     = 'llms-txt.md'
 # LPG Webapp Visual & Graph Config
 $ExportName       = 'llms-mega-manifest'
 $GraphId          = 'graph1'
-$DefaultNodeColor = '#00b4f0'
-$FolderColor      = '#70db43'
-$FileColor        = '#a000f0'
-$DefaultRadius    = 20
-$FolderRadius     = 40
-$FileRadius       = 15
+
+# Tiered Depth Styling (Index 0 = Root, Index 1 = Level 1, etc. Caps out at the last color)
+$TierColors       = @(
+    '#00b4f0', # Level 0 (ROOT - Cyan/Blue)
+    '#70db43', # Level 1 (Green)
+    '#c8f000', # Level 2 (Yellow-Green)
+    '#a000f0', # Level 3 (Purple)
+    '#ff6666'  # Level 4+ (Coral/Red for deep subfolders)
+)
+$TierRadii        = @(50, 40, 30, 25, 20) # Sizing scales down as depth increases
 # =====================================================================  END VARIABLES
 
 $ErrorActionPreference = 'Stop'
@@ -59,9 +63,13 @@ foreach ($mpath in [IO.Directory]::EnumerateFiles((ConvertTo-LongPath $tree), $M
   $nodeId   = if ($mf.id -eq '.') { 'llms-root' } else { [string]$mf.id }
   $nodeName = if ($mf.name) { $mf.name } else { $nodeId }
 
-  # Colors & Sizing
-  $nodeColor  = if ($mf.type -eq 'folder') { $FolderColor } else { $DefaultNodeColor }
-  $nodeRadius = if ($mf.type -eq 'folder') { $FolderRadius } else { $DefaultRadius }
+  # --- Programmatic Depth & Tier Calculation ---
+  $depth = if ($mf.id -eq '.') { 0 } else { ($mf.id -split '/').Count }
+  $colorIndex = [Math]::Min($depth, ($TierColors.Length - 1))
+  $radiusIndex = [Math]::Min($depth, ($TierRadii.Length - 1))
+
+  $nodeColor  = $TierColors[$colorIndex]
+  $nodeRadius = $TierRadii[$radiusIndex]
 
   # Original structured node object
   $node = [ordered]@{
@@ -84,6 +92,7 @@ foreach ($mpath in [IO.Directory]::EnumerateFiles((ConvertTo-LongPath $tree), $M
     directFiles = [long]$mf.stats.directFiles
     flags       = (@($mf.flags) -join ', ')
     treeSig     = [string]$mf.treeSig
+    depth       = $depth
   }
 
   $webappNode = [ordered]@{
@@ -104,7 +113,7 @@ foreach ($mpath in [IO.Directory]::EnumerateFiles((ConvertTo-LongPath $tree), $M
 }
 
 $items = @($items | Sort-Object { $_.Id })
-Write-Host "Read $($items.Count) manifests."
+Write-Host "Read $($items.Count) manifests and calculated tiered depths."
 
 # ---- Edges (Tree Hierarchy)
 $edges = New-Object 'System.Collections.Generic.List[object]'
@@ -136,7 +145,6 @@ foreach ($it in $items) {
 [IO.File]::WriteAllLines((Join-Path $RunDir 'mega-manifest.jsonl'), [string[]]@($items | ForEach-Object { $_.Json }), $utf8)
 
 # ---- 2. LPG Webapp Graph JSON Output (mega-manifest.json)
-# Safely built arrays for PowerShell 5.1 compatibility
 $webappNodesArray = foreach ($it in $items) { $it.WebappNode }
 $webappEdgesArray = foreach ($we in $webappEdges) { $we }
 
@@ -176,8 +184,8 @@ foreach ($it in $items) {
 }
 [IO.File]::WriteAllText((Join-Path $RunDir 'mega-catalog.md'), $sb.ToString(), $utf8)
 
-Write-Host "Success! Generated all files in $RunDir:"
-Write-Host "  - mega-manifest.json (LPG Webapp Graph format)"
+Write-Host "Success! Generated all tier-painted files in ${RunDir}:"
+Write-Host "  - mega-manifest.json (LPG Webapp Graph format with depth coloring)"
 Write-Host "  - mega-manifest.jsonl"
 Write-Host "  - nodes.csv & edges.csv"
 Write-Host "  - mega-catalog.md"
