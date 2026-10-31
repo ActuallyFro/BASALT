@@ -12,7 +12,7 @@
 
 # =====================================================================  VARIABLES (edit me)
 $RunDir  = 'C:\Users\zasz_\llms-out\20261030-202409'   # Pass 0 run folder (must contain folders.tsv AND classification.tsv from Pass 1)
-$DryRun  = $true                                # $false = actually write files
+$DryRun  = $false                                # $false = actually write files
 $LlmsFileName     = 'llms.txt'
 $ManifestFileName = 'llms-manifest.json'
 $MaxEntries       = 53       # first prime > 50: hard cap on links per llms.txt
