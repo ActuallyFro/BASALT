@@ -44,7 +44,7 @@ $ChildChars  = 220                                  # per-child summary excerpt 
 $ChildMax    = 40
 $PreviewCount= 2
 
-$LlmsFileName     = 'llms.txt'
+$LlmsFileName     = 'llms-txt.md'   # must match Pass 2
 $ManifestFileName = 'llms-manifest.json'
 $TextExts    = @('.md','.txt','.rst','.cfg','.ini','.json','.yml','.yaml','.toml','.xml','.csv','.py','.m','.ps1','.sh','.c','.h','.cpp','.cs','.js','.ts','.java','.go','.rs','.bat','.cmd','.html','.tex')
 $PreferNames = @('readme.md','readme.txt','readme','readme.rst','package.json','pyproject.toml','setup.py','cargo.toml','makefile','index.md','manifest.json')

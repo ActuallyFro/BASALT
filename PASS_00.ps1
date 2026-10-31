@@ -16,7 +16,7 @@ $SniffUnknown  = $false                                   # $true = read first 5
 $MaxDepth      = 0                                        # 0 = unlimited; 2 = quick dry run
 
 $Config = @{
-  LlmsFileName        = 'llms.txt'             # assumed to exist NOWHERE in the source tree; collisions are logged
+  LlmsFileName        = 'llms-txt.md'          # assumed to exist NOWHERE in the source tree; collisions are logged (plain llms.txt is flagged too)
   ManifestFileName    = 'llms-manifest.json'
   SkipHiddenDirs      = $true                  # hidden dirs are "subsumed by their parent"
   FollowReparsePoints = $false                 # symlinks / junctions are never traversed
@@ -63,6 +63,7 @@ $MarkerDirs = $Config.MarkerDirNames
 $MarkerFiles = $Config.MarkerFileNames
 $MarkerExts = $Config.MarkerExts
 $MarkerFiles[$Config.LlmsFileName] = 'LlmsCollision'
+$MarkerFiles['llms.txt'] = 'LlmsCollision'
 $MarkerFiles[$Config.ManifestFileName] = 'LlmsCollision'
 $ReadmePrefix = $Config.ReadmePrefix
 

@@ -13,7 +13,8 @@
 # =====================================================================  VARIABLES (edit me)
 $RunDir  = 'C:\Users\zasz_\llms-out\20261030-202409'   # Pass 0 run folder (must contain folders.tsv AND classification.tsv from Pass 1)
 $DryRun  = $false                                # $false = actually write files
-$LlmsFileName     = 'llms.txt'
+$CleanTree = $true                              # $true = delete the old <RunDir>\tree first (sidecar only) so renamed/stale files do not linger
+$LlmsFileName     = 'llms-txt.md'   # sidecar name (VS Code previews .md). Rename to 'llms.txt' at publish time if agents must fetch /llms.txt
 $ManifestFileName = 'llms-manifest.json'
 $MaxEntries       = 53       # first prime > 50: hard cap on links per llms.txt
 $ReserveEntries   = 6        # links kept free for README + subfolder entries before a chunk is forced into groups (R-211)
@@ -245,6 +246,7 @@ if ($DryRun) {
   Write-Host ''; Write-Host 'Dry run only. Set $DryRun = $false and paste again to write the sidecar tree.'
 } else {
   $treeRoot = Join-Path $RunDir 'tree'
+  if ($CleanTree -and (Test-Path -LiteralPath $treeRoot)) { [IO.Directory]::Delete((ConvertTo-LongPath $treeRoot), $true); Write-Host "Removed old sidecar tree: $treeRoot" }
   $utf8 = New-Object System.Text.UTF8Encoding($false)
   $idx = New-Object 'System.Collections.Generic.List[string]'; $idx.Add("Rel`tType`tFile`tLinks`tBytes")
   foreach ($f in $Files) {
