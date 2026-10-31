@@ -12,7 +12,7 @@
 
 # =====================================================================  VARIABLES (edit me)
 $RunDir      = 'C:\Users\zasz_\llms-out\20261030-202409'   # Pass 0/1/2 run folder
-$DryRun      = $true                                # $false = call the model and write summaries
+$DryRun      = $false                                # $false = call the model and write summaries
 $Only        = ''                                   # '' = all chunks; or one chunk id, e.g. 'steamapps/common/Fallout 4'  (use '.' for the root)
 $Limit       = 0                                    # 0 = no limit; N = stop after N model calls (good for a first trial: 3)
 $Redo        = $false                               # $true = also regenerate chunks that already have a summary
@@ -32,7 +32,11 @@ $MinWords    = 25
 $MaxWords    = 115
 $HeadLines   = 80                                   # per text file
 $HeadMaxBytes= 4096                                 # per text file
-$TextFilesMax= 4                                    # README + other small text files read per chunk
+$TextFilesMax= 4                                    # max text files read per chunk (README-class first)
+$OtherFilesMax = 2                                  # of those, at most this many are NOT readme-class (code/config/etc.)
+$OtherHeadLines = 25                                # shorter excerpt for non-readme files
+$OtherHeadMaxBytes = 1500
+$DirNameSample = 30                                 # subfolder names shown to the model
 $FileNameSample = 30                                # loose file names shown to the model
 $EnumCap     = 3000                                 # never enumerate more than this many entries in one folder
 $EvidenceMaxChars = 14000
@@ -73,11 +77,11 @@ function Join-Rel([string]$baseDir, [string]$rel, [string]$sep) {   # rel uses '
   if ($rel -ne '.') { foreach ($seg in ($rel -split '[\\/]')) { if ($seg) { $d = [IO.Path]::Combine($d, $seg) } } }
   return $d
 }
-function Get-Head([string]$path) {
-  $buf = New-Object byte[] $HeadMaxBytes; $got = 0
+function Get-Head([string]$path, [int]$maxLines, [int]$maxBytes) {
+  $buf = New-Object byte[] $maxBytes; $got = 0
   try {
     $fs = [IO.File]::Open((ConvertTo-LongPath $path), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
-    try { $got = $fs.Read($buf, 0, $HeadMaxBytes) } finally { $fs.Dispose() }
+    try { $got = $fs.Read($buf, 0, $maxBytes) } finally { $fs.Dispose() }
   } catch { return $null }
   if ($got -le 0) { return '' }
   if ($got -ge 2 -and $buf[0] -eq 0xFF -and $buf[1] -eq 0xFE) { $txt = [Text.Encoding]::Unicode.GetString($buf, 2, $got - 2) }
@@ -87,7 +91,7 @@ function Get-Head([string]$path) {
     $txt = [Text.Encoding]::UTF8.GetString($buf, 0, $got)
   }
   $lines = $txt -split "`r?`n"
-  if ($lines.Count -gt $HeadLines) { $lines = $lines[0..($HeadLines - 1)] }
+  if ($lines.Count -gt $maxLines) { $lines = $lines[0..($maxLines - 1)] }
   return ($lines -join "`n").TrimEnd()
 }
 function Get-Blockquote([string]$text) {
@@ -180,22 +184,34 @@ function New-Evidence($rel, $man, [string]$myDir) {
       }
     } catch {}
   } else { [void]$sb.Append("(source folder not reachable from this machine: $srcDir)`n`n") }
-  $chosen = New-Object 'System.Collections.Generic.List[string]'
-  foreach ($nm in @($man.readmes)) { if ($nm -and ($loose -contains $nm) -and $chosen.Count -lt $TextFilesMax) { $chosen.Add($nm) } }
-  foreach ($pn in $PreferNames) { foreach ($nm in $loose) { if ($nm.ToLowerInvariant() -eq $pn -and -not $chosen.Contains($nm) -and $chosen.Count -lt $TextFilesMax) { $chosen.Add($nm) } } }
+  $primary = New-Object 'System.Collections.Generic.List[string]'
+  foreach ($nm in @($man.readmes)) { if ($nm -and ($loose -contains $nm) -and $primary.Count -lt $TextFilesMax) { $primary.Add($nm) } }
+  foreach ($pn in $PreferNames) { foreach ($nm in $loose) { if ($nm.ToLowerInvariant() -eq $pn -and -not $primary.Contains($nm) -and $primary.Count -lt $TextFilesMax) { $primary.Add($nm) } } }
+  $secondary = New-Object 'System.Collections.Generic.List[string]'
+  $secMax = [math]::Min($OtherFilesMax, [math]::Max(0, $TextFilesMax - $primary.Count))
+  if ($primary.Count -eq 0) { $secMax = [math]::Min($OtherFilesMax, $TextFilesMax) }
   foreach ($nm in ($loose | Sort-Object)) {
-    if ($chosen.Count -ge $TextFilesMax) { break }
+    if ($secondary.Count -ge $secMax) { break }
     $ex = [IO.Path]::GetExtension($nm).ToLowerInvariant()
-    if (($TextExts -contains $ex) -and -not $chosen.Contains($nm)) { $chosen.Add($nm) }
+    if (($TextExts -contains $ex) -and -not $primary.Contains($nm)) { $secondary.Add($nm) }
   }
-  foreach ($nm in $chosen) {
-    $head = Get-Head ([IO.Path]::Combine($srcDir, $nm))
+  foreach ($nm in $primary) {
+    $head = Get-Head ([IO.Path]::Combine($srcDir, $nm)) $HeadLines $HeadMaxBytes
     if ($head) { [void]$sb.Append("FILE: $nm (first lines)`n$head`n`n") }
+  }
+  foreach ($nm in $secondary) {
+    $head = Get-Head ([IO.Path]::Combine($srcDir, $nm)) $OtherHeadLines $OtherHeadMaxBytes
+    if ($head) { [void]$sb.Append("FILE: $nm (short excerpt)`n$head`n`n") }
   }
   if ($loose.Count -gt 0) {
     $show = @($loose | Select-Object -First $FileNameSample) -join ', '
     $more = ''; if ($loose.Count -ge $EnumCap) { $more = " (at least $EnumCap files directly here)" } elseif ($loose.Count -gt $FileNameSample) { $more = " (of $($loose.Count) files directly here)" }
     [void]$sb.Append("FILES DIRECTLY IN THIS FOLDER$more`: $show`n`n")
+  }
+  if ($srcOk) {
+    $dn = @(); $dc = 0
+    try { foreach ($dp in [IO.Directory]::EnumerateDirectories((ConvertTo-LongPath $srcDir))) { $dc++; if ($dn.Count -lt $DirNameSample) { $dn += [IO.Path]::GetFileName($dp) }; if ($dc -ge $EnumCap) { break } } } catch {}
+    if ($dn.Count -gt 0) { $dm = ''; if ($dc -gt $dn.Count) { $dm = " (first $($dn.Count) of $dc)" }; [void]$sb.Append("SUBFOLDER NAMES$dm`: $($dn -join ', ')`n`n") }
   }
   if ($man.subfoldersListed -and @($man.subfoldersListed).Count) { [void]$sb.Append("LARGER SUBFOLDERS: $(@($man.subfoldersListed) -join ', ')`n`n") }
 
@@ -223,7 +239,7 @@ function New-Prompt([string]$evidence, [string]$extra) {
   return @"
 You are writing one entry of an index that AI agents use to decide whether a folder is worth opening.
 Write a plain-prose summary of $MinWords to $MaxWords words that says what this folder is, what kinds of files and sub-parts it contains, and its apparent purpose.
-Rules: use only the evidence below; if unsure, say "appears to"; do not invent names, versions or dates; no markdown, no bullet points, no quotation marks, no preamble such as "This summary". Output the summary text only.$extra
+Rules: use only the evidence below; if unsure, say "appears to"; do not invent names, versions or dates. Text excerpts may be incidental (a notice, a license, boilerplate code); weigh the folder's size, file types and structure at least as much as any single excerpt. No markdown, no bullet points, no quotation marks, no preamble such as "This summary". Output the summary text only.$extra
 
 EVIDENCE
 $evidence
