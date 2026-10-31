@@ -7,7 +7,7 @@
 #>
 
 # =====================================================================  VARIABLES (edit me)
-$RunDir  = 'D:\llms-out\REPLACE-WITH-STAMP'     # the Pass 0 run folder that holds folders.tsv
+$RunDir  = 'C:\Users\zasz_\llms-out\20261030-202409'     # the Pass 0 run folder that holds folders.tsv
 $P = @{
   MinChunkBytes     = 500MB    # R-120  below this a folder is SUBSUMED (repos exempt)
   MaxLeafBytes      = 60GB     # R-125  non-stop folders at or below this close as a leaf (no deeper chunks)  <-- main granularity knob

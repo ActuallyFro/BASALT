@@ -11,7 +11,7 @@
 #>
 
 # =====================================================================  VARIABLES (edit me)
-$RunDir  = 'D:\llms-out\REPLACE-WITH-STAMP'   # Pass 0 run folder (must contain folders.tsv AND classification.tsv from Pass 1)
+$RunDir  = 'C:\Users\zasz_\llms-out\20261030-202409'   # Pass 0 run folder (must contain folders.tsv AND classification.tsv from Pass 1)
 $DryRun  = $true                                # $false = actually write files
 $LlmsFileName     = 'llms.txt'
 $ManifestFileName = 'llms-manifest.json'
@@ -49,7 +49,10 @@ function Format-Size([long]$b) {
   if ($b -ge 1KB) { return ('{0:N0} KB' -f ($b / 1KB)) }
   return "$b B"
 }
-function ConvertTo-Url([string]$rel) { return (($rel.Split('\') | ForEach-Object { [uri]::EscapeDataString($_) }) -join '/') }
+function ConvertTo-Url([string]$rel) {
+  # .NET Framework (PS 5.1) leaves ! * ' ( ) unescaped; parentheses would break markdown links, so escape them explicitly
+  return (($rel.Split('\') | ForEach-Object { [uri]::EscapeDataString($_).Replace('(', '%28').Replace(')', '%29').Replace("'", '%27').Replace('!', '%21').Replace('*', '%2A') }) -join '/')
+}
 function ConvertTo-LinkText([string]$s) { return $s.Replace('[', '\[').Replace(']', '\]') }
 function Get-ParentRel([string]$rel) { $i = $rel.LastIndexOf('\'); if ($i -lt 0) { return '.' }; return $rel.Substring(0, $i) }
 function Get-LeafName([string]$rel) { $i = $rel.LastIndexOf('\'); if ($i -lt 0) { return $rel }; return $rel.Substring($i + 1) }
@@ -184,7 +187,10 @@ foreach ($c in ($ChunkMap.Values | Sort-Object { $_.Rel })) {
   $te = Get-TopExt $n 5; if ($te) { [void]$sb.Append("Top file types by size: $te.`n`n") }
   if ($n.SM.ContainsKey('Repo') -and $c.Type -ne 'REPO') { [void]$sb.Append("Contains $($n.SM['Repo']) git repo(s) below this folder.`n`n") }
   if ($c.Type -in @('OPAQUE-BULK','BLOB','DATASET','MIXED-LEAF','REPO','PROJECT')) { [void]$sb.Append("Contents are not itemised file by file; use the sections below to navigate.`n`n") }
-  if ($omitN -gt 0 -or $n.DF -gt 0) { [void]$sb.Append("Not listed: $omitN smaller subfolder(s) totalling $(Format-Size $omitB), and $('{0:N0}' -f $n.DF) loose file(s) ($(Format-Size $n.DB)) directly in this folder.`n`n") }
+  $np = @()
+  if ($omitN -gt 0) { $np += "$omitN smaller subfolder(s) totalling $(Format-Size $omitB)" }
+  if ($n.DF -gt 0) { $np += "$('{0:N0}' -f $n.DF) loose file(s) ($(Format-Size $n.DB)) directly in this folder" }
+  if ($np.Count -gt 0) { [void]$sb.Append("Not listed: " + ($np -join ', and ') + ".`n`n") }
   if ($groupNames.Count -gt 0) { [void]$sb.Append("This folder has $($items.Count) chunk children, so they are listed through $($groupNames.Count) group file(s).`n`n") }
   $links = 0
   if ($mainItems.Count) { [void]$sb.Append("## Chunks`n"); foreach ($i in $mainItems) { [void]$sb.Append("- [$(ConvertTo-LinkText $i.Name)]($($i.Link)): $($i.Desc)`n"); $links++ }; [void]$sb.Append("`n") }
@@ -219,8 +225,8 @@ foreach ($f in $Files) {
   $lines = $f.Text.Split("`n")
   if (-not $lines[0].StartsWith('# ')) { $Problems.Add("H1 not first: $($f.Rel)") }
   $h1 = @($lines | Where-Object { $_ -match '^# ' }).Count; if ($h1 -ne 1) { $Problems.Add("expected 1 H1, found ${h1}: $($f.Rel)") }
-  $firstH2 = ($lines | Select-String -Pattern '^## ' -SimpleMatch:$false | Select-Object -First 1)
-  $pre = if ($firstH2) { $lines[0..($firstH2.LineNumber - 2)] } else { $lines }
+  $h2 = -1; for ($li = 0; $li -lt $lines.Count; $li++) { if ($lines[$li].StartsWith('## ')) { $h2 = $li; break } }
+  if ($h2 -gt 0) { $pre = $lines[0..($h2 - 1)] } else { $pre = $lines }
   if (@($pre | Where-Object { $_ -match '^#{3,6} ' }).Count -gt 0) { $Problems.Add("heading before first H2: $($f.Rel)") }
   $lc = @($lines | Where-Object { $_ -match '^- \[' }).Count; if ($lc -gt $MaxEntries) { $Problems.Add("link cap exceeded ($lc): $($f.Rel)") }
 }
@@ -228,13 +234,13 @@ $llmsFiles = @($Files | Where-Object { $_.Name -eq $LlmsFileName })
 $report = New-Object 'System.Collections.Generic.List[string]'
 $report.Add("llms-tree Pass 2 $(if ($DryRun) { 'DRY RUN (nothing written)' } else { 'WRITE' })   chunks=$($ChunkMap.Count)  emitted=$($ChunkMap.Count - $script:collapsedCount)  collapsed wrappers=$($script:collapsedCount)  group files=$($script:groupCount)")
 $report.Add("files to write: $($llmsFiles.Count) $LlmsFileName (incl. groups) + $(@($Files | Where-Object { $_.Name -eq $ManifestFileName }).Count) $ManifestFileName")
-$report.Add("max links in one file: $(($llmsFiles | Measure-Object Links -Maximum).Maximum)  (cap $MaxEntries)")
+$report.Add("max links in one file: $(($llmsFiles | ForEach-Object { $_.Links } | Measure-Object -Maximum).Maximum)  (cap $MaxEntries)")
 $report.Add("validation problems: $($Problems.Count)"); foreach ($p in $Problems) { $report.Add("  - $p") }
 
 # ---------------------------------------------------------------- dry run / write
 if ($DryRun) {
   $report | ForEach-Object { Write-Host $_ }
-  $pick = @($llmsFiles | Where-Object { $_.Rel -eq '.' }) + @($llmsFiles | Where-Object { $_.Rel -ne '.' -and $_.Type -ne 'GROUP' } | Sort-Object Bytes -Descending | Select-Object -First ($PreviewCount - 1))
+  $pick = @($llmsFiles | Where-Object { $_.Rel -eq '.' }) + @($llmsFiles | Where-Object { $_.Rel -ne '.' -and $_.Type -ne 'GROUP' } | Sort-Object { $_.Bytes } -Descending | Select-Object -First ($PreviewCount - 1))
   foreach ($f in $pick) { Write-Host ''; Write-Host ("=================== PREVIEW: {0} ({1}) ===================" -f $f.Rel, $f.Type); Write-Host $f.Text }
   Write-Host ''; Write-Host 'Dry run only. Set $DryRun = $false and paste again to write the sidecar tree.'
 } else {
