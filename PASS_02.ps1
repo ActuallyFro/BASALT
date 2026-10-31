@@ -11,9 +11,9 @@
 #>
 
 # =====================================================================  VARIABLES (edit me)
-$RunDir  = 'C:\Users\zasz_\llms-out\20261030-202409'   # Pass 0 run folder (must contain folders.tsv AND classification.tsv from Pass 1)
-$DryRun  = $false                                # $false = actually write files
-$CleanTree = $true                              # $true = delete the old <RunDir>\tree first (sidecar only) so renamed/stale files do not linger
+$RunDir          = 'C:\Users\zasz_\llms-out\20261031-124239'   # Pass 0 run folder (must contain folders.tsv AND classification.tsv from Pass 1)
+$DryRun          = $false                      # $false = actually write files
+$CleanTree       = $true                       # $true = delete the old <RunDir>\tree first (sidecar only) so renamed/stale files do not linger
 $LlmsFileName     = 'llms-txt.md'   # sidecar name (VS Code previews .md). Rename to 'llms.txt' at publish time if agents must fetch /llms.txt
 $ManifestFileName = 'llms-manifest.json'
 $MaxEntries       = 53       # first prime > 50: hard cap on links per llms.txt
@@ -233,7 +233,7 @@ foreach ($f in $Files) {
 }
 $llmsFiles = @($Files | Where-Object { $_.Name -eq $LlmsFileName })
 $report = New-Object 'System.Collections.Generic.List[string]'
-$report.Add("llms-tree Pass 2 $(if ($DryRun) { 'DRY RUN (nothing written)' } else { 'WRITE' })   chunks=$($ChunkMap.Count)  emitted=$($ChunkMap.Count - $script:collapsedCount)  collapsed wrappers=$($script:collapsedCount)  group files=$($script:groupCount)")
+$report.Add("llms-tree Pass 2 $(if ($DryRun) { 'DRY RUN (nothing written)' } else { 'WRITE' })  chunks=$($ChunkMap.Count)  emitted=$($ChunkMap.Count - $script:collapsedCount)  collapsed wrappers=$($script:collapsedCount)  group files=$($script:groupCount)")
 $report.Add("files to write: $($llmsFiles.Count) $LlmsFileName (incl. groups) + $(@($Files | Where-Object { $_.Name -eq $ManifestFileName }).Count) $ManifestFileName")
 $report.Add("max links in one file: $(($llmsFiles | ForEach-Object { $_.Links } | Measure-Object -Maximum).Maximum)  (cap $MaxEntries)")
 $report.Add("validation problems: $($Problems.Count)"); foreach ($p in $Problems) { $report.Add("  - $p") }
