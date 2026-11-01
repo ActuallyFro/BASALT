@@ -226,6 +226,7 @@ function global:LxMdBlocks([string]$text) {
   foreach ($ln in ($text -split "`r?`n")) {
     if ($ln.Trim() -eq '') { continue }
     if ($ln.StartsWith('# ')) { $blocks.Add(@{ Kind = 'h1'; In = (LxMdInlines $ln.Substring(2)) }) }
+    elseif ($ln.StartsWith('### ')) { $blocks.Add(@{ Kind = 'h3'; In = (LxMdInlines $ln.Substring(4)) }) }
     elseif ($ln.StartsWith('## ')) { $blocks.Add(@{ Kind = 'h2'; In = (LxMdInlines $ln.Substring(3)) }) }
     elseif ($ln.StartsWith('> ')) { $blocks.Add(@{ Kind = 'quote'; In = (LxMdInlines $ln.Substring(2)) }) }
     elseif ($ln -match '^\s*[-*] ') { $blocks.Add(@{ Kind = 'li'; In = (LxMdInlines ($ln -replace '^\s*[-*] ', '')) }) }
@@ -263,11 +264,13 @@ function global:LxMdDoc([string]$text, [string]$dirRel) {
   $doc = New-Object System.Windows.Documents.FlowDocument
   $doc.FontFamily = New-Object System.Windows.Media.FontFamily 'Segoe UI'; $doc.FontSize = 14
   $doc.PagePadding = New-Object System.Windows.Thickness 18; $doc.Foreground = $T.Fg; $doc.Background = $T.Bg
+  $heads = New-Object 'System.Collections.Generic.List[object]'
   foreach ($b in (LxMdBlocks $text)) {
     $p = New-Object System.Windows.Documents.Paragraph
     $p.Margin = New-Object System.Windows.Thickness 0, 3, 0, 3
     switch ($b.Kind) {
       'h1' { $p.FontSize = 26; $p.FontWeight = [System.Windows.FontWeights]::Bold; $p.Margin = New-Object System.Windows.Thickness 0, 0, 0, 8 }
+      'h3' { $p.FontSize = 15; $p.FontWeight = [System.Windows.FontWeights]::Bold; $p.Margin = New-Object System.Windows.Thickness 0, 10, 0, 2 }
       'h2' { $p.FontSize = 19; $p.FontWeight = [System.Windows.FontWeights]::Bold; $p.Margin = New-Object System.Windows.Thickness 0, 14, 0, 4 }
       'quote' { $p.FontStyle = [System.Windows.FontStyles]::Italic; $p.BorderBrush = $T.Accent; $p.BorderThickness = New-Object System.Windows.Thickness 3, 0, 0, 0
                 $p.Padding = New-Object System.Windows.Thickness 10, 4, 4, 4; $p.Margin = New-Object System.Windows.Thickness 0, 4, 0, 8; $p.Background = $T.Panel }
@@ -287,11 +290,14 @@ function global:LxMdDoc([string]$text, [string]$dirRel) {
         }
       }
     }
+    if ($b.Kind -in @('h1', 'h2', 'h3')) { $heads.Add(@{ Title = (@($b.In | ForEach-Object { $_.Text }) -join ''); Level = [int]$b.Kind.Substring(1); Para = $p }) }
     [void]$doc.Blocks.Add($p)
   }
+  $doc.Tag = $heads
   return $doc
 }
 function global:LxOnLink($tag) {
+  if ([string]$tag.Url -like 'help:*') { LxHelpGoto ([string]$tag.Url).Substring(5); return }
   $r = LxResolveLink $tag.Dir $tag.Url
   switch ($r.Kind) {
     'doc'    { LxNavigate $r.Rel $null $true $false }
@@ -365,7 +371,7 @@ function global:LxSearch([string]$q) {
       $res.Add(@{ Rel = $k; Type = 'folder'; Bytes = $rec[2]; Files = $rec[1]; Score = 0; Snippet = '' })
     }
   }
-  return ,@($res | Sort-Object @{ Expression = { $_.Score }; Descending = $true }, @{ Expression = { $_.Bytes }; Descending = $true } | Select-Object -First $max)   # comma: keep a 1-item result an array
+  return @($res | Sort-Object @{ Expression = { $_.Score }; Descending = $true }, @{ Expression = { $_.Bytes }; Descending = $true } | Select-Object -First $max)
 }
 
 # ---------------------------------------------------------------- tree (lazy)
@@ -573,6 +579,7 @@ function global:LxAsk {
   $async = $ps.BeginInvoke()
   $G.Ask = @{ Ps = $ps; Async = $async; Q = $q }
   $W.BtnAsk.IsEnabled = $false
+  $W.TxtQuestion.Clear(); [void]$W.TxtQuestion.Focus()
   $timer = New-Object System.Windows.Threading.DispatcherTimer; $timer.Interval = [TimeSpan]::FromMilliseconds(400)
   $timer.Add_Tick({
     $G = $global:G; $W = $global:W
@@ -588,10 +595,128 @@ function global:LxAsk {
   })
   $timer.Start(); $G.Ask.Timer = $timer
 }
+function global:LxClearChat {
+  $G = $global:G; $W = $global:W; $tb = $W.TxtTranscript
+  $n = 60; if ($tb.ActualHeight -gt 0) { $n = [int][math]::Ceiling($tb.ActualHeight / ($tb.FontSize * 1.45)) + 2 }
+  $tb.AppendText(("`r`n" * $n) + "---------- screen cleared (scroll up for earlier chat) ----------`r`n`r`n"); $tb.ScrollToEnd()
+  $G.Chat.Clear()
+  $W.TxtStatus.Text = 'Chat screen cleared. Earlier chat is still above (scroll up); the model no longer receives earlier turns.'
+}
+function global:LxEraseChat { $global:G.Chat.Clear(); $global:W.TxtTranscript.Clear(); $global:W.TxtStatus.Text = 'Chat history erased.' }
 function global:LxCancelAsk {
   $G = $global:G; $W = $global:W
   if ($G.Ask) { try { $G.Ask.Timer.Stop(); $G.Ask.Ps.Stop(); $G.Ask.Ps.Dispose() } catch {}; $G.Ask = $null; $W.BtnAsk.IsEnabled = $true; $W.TxtTranscript.AppendText("[cancelled]`r`n") }
 }
+
+
+function global:LxHelpText { return @'
+# llms-tree explorer
+A read-only explorer for one finished llms-tree run. It shows the folders found by Pass 0, the chunks chosen by Pass 1, the index pages written by Pass 2 and the summaries written by Pass 3. It only reads files inside the run folder. The one thing it can write is annotations.json (your stars and notes).
+## Quick start
+- Click a folder in the tree on the left. Its index page appears on the right.
+- Click blue links in the page to jump to a chunk or folder. Links to source files (for example a README) are shown as unavailable because source files are outside the run folder.
+- Use [Home, Back and Fwd](help:Navigation) to move around, and the [search box](help:Search) to find things.
+- Press **F1** at any time to open this help. Press **Esc** to close it.
+## The folder tree
+### What you see on each row
+- A coloured dot shows the depth: cyan = root, green = level 1, yellow-green = level 2, purple = level 3, coral = deeper.
+- A badge such as [REPO] marks a chunk and its type. Folders with no badge are ordinary folders inside a chunk. See [Chunk types](help:Chunk types).
+- The grey text is the folder size. The small bar is its share of the parent folder size.
+- A star or tick shows your [Notes](help:Notes) (starred or reviewed).
+### Chunks only or all folders
+- Tick **Chunks only** to show just the index pages, which is the shape an agent would navigate. Untick it to see every folder.
+- If you jump to a folder that is not visible in Chunks only mode, the tree selects the nearest chunk above it.
+### Sorting and the row cap
+- Sort by size (largest first) or by name with the box at the top right.
+- Each folder shows at most 500 children at a time (setting TreeChildCap). A last row tells you how many more exist. Use search to reach them.
+## Chunk types
+- **REPO**: a git repository. The explorer treats it as one unit.
+- **PROJECT**: a folder with build files or a README, treated as one unit.
+- **OPAQUE-BULK**: a large pile of similar files (for example thousands of images) that is described, not itemised.
+- **BLOB**: only a few files, but huge ones (game archives, disk images).
+- **DATASET**: signal recordings or data files.
+- **CONTAINER**: a folder whose useful content is several separate chunks.
+- **WRAPPER**: a pass-through folder around one larger collection.
+- **MIXED-LEAF**: a mixed folder with no clearer structure, closed as one unit.
+## Reading a folder
+### Summary
+- The rendered index page: a short summary, the facts, then lists of child chunks, key files and larger subfolders.
+- If the folder is not a chunk, you see a short note, a link to the nearest chunk and its biggest subfolders.
+### Facts
+- Sizes, file counts, dates, markers and file-type histograms, read live from folders.tsv.
+- Subfolders are listed largest first. A star marks a chunk.
+### Manifest
+- The raw llms-manifest.json for the chunk (type, rule, children, statistics, tree signature).
+### Search results
+- The hits for your last search. Double-click a row to open it.
+## Navigation
+- **Home** clears the search, collapses the tree and returns to the root.
+- **Back** and **Fwd** step through the folders you visited.
+- The path at the top is clickable: click any part to jump up to that folder.
+- Clicking a tree row, a link in a page, or a search result all count as visits.
+## Search
+### What you can type
+- Words must all match (AND). Use quotes for a phrase, for example "game engine".
+- **type:REPO** (or PROJECT, BLOB, DATASET, OPAQUE-BULK, CONTAINER, WRAPPER, MIXED-LEAF, folder).
+- **flag:cold** finds chunks flagged as old or archive-like.
+- **is:chunk** or **is:folder** limits the kind of result.
+- **size>10GB**, **size<500MB**, **files>1000**, **files<500**, **depth<=3** (operators: > < >= <= =).
+### Examples
+- fallout type:PROJECT
+- size>20GB is:chunk
+- "save game" files<5000
+- type:BLOB archive
+- is:folder size>1GB depth<=3
+### Where it looks
+- Chunks: folder path, type, flags and the full text of the index page (including the summary).
+- Plain folders: path only (file names are not recorded in a run).
+- Results are limited to 500. Press Enter in the box or click Search; Clear empties the box and the list.
+## Ask Ollama
+### What it sends
+- Your question plus index data from the run folder: facts and index page of the selected folder, summaries of its child chunks, and optionally the current search hits. The total is capped (setting AskContextChars).
+- The model never sees source files. If the answer is not in the index data, it should say so.
+### Controls
+- Tick or untick the context boxes under the chat. **Raw** sends only your text, with no index data, like a plain chat.
+- **Ask** sends the question and clears the box. **Ctrl+Enter** does the same. **Cancel** stops a running question.
+- **Clear screen** works like cls: the view jumps to a fresh page, but you can scroll up to read earlier chat. It also stops earlier turns from being sent to the model.
+- **Erase history** really deletes the transcript.
+- The model name box overrides the default for this session. Mode, address and other options are in the Ollama section of the settings at the top of the script.
+## Notes
+- Star, Reviewed and a free-text note for the selected folder. Press **Save notes** to write annotations.json in the run folder.
+- Copy source path puts the original path on the clipboard. Open source folder and Show index file open Windows Explorer (if the path is reachable).
+## Settings
+- All settings are variables in the Cfg block at the top of the script: RunDir, Theme, StartChunksOnly, TreeChildCap, SearchMax, AskContextChars, the Ollama section, AllowOpenSource and SelfTest.
+- Set SelfTest to true to run the data checks without opening the window.
+## Troubleshooting
+- Errors appear in the status bar at the bottom and in the console.
+- If the tree is empty, check that RunDir contains folders.tsv and a tree folder from Pass 2.
+- If Ask returns an error, check that Ollama is running and the model name exists in ollama list.
+- If summaries read "(no summary yet)", run Pass 3 and reopen the explorer.
+## Keyboard
+- **F1** help, **Esc** close help, **Enter** in the search box runs the search, **Ctrl+Enter** in the question box asks.
+'@ }
+function global:LxHelpGoto([string]$title) {
+  $W = $global:W
+  foreach ($it in $W.HelpToc.Items) { if ([string]$it.Content -ieq $title) { $W.HelpToc.SelectedItem = $it; return } }
+  $W.TxtStatus.Text = "Help section not found: $title"
+}
+function global:LxHelpShow {
+  $G = $global:G; $W = $global:W
+  if (-not $G.HelpBuilt) {
+    $doc = LxMdDoc (LxHelpText) ''
+    $W.HelpViewer.Document = $doc
+    foreach ($h in $doc.Tag) {
+      $li = New-Object System.Windows.Controls.ListBoxItem; $li.Content = $h.Title; $li.Tag = $h.Para; $li.Foreground = $G.Theme.Fg
+      if ($h.Level -eq 1) { $li.FontWeight = [System.Windows.FontWeights]::Bold }
+      elseif ($h.Level -eq 3) { $li.Padding = New-Object System.Windows.Thickness 24, 2, 2, 2 }
+      else { $li.Padding = New-Object System.Windows.Thickness 8, 2, 2, 2 }
+      [void]$W.HelpToc.Items.Add($li)
+    }
+    $G.HelpBuilt = $true
+  }
+  $W.HelpOverlay.Visibility = [System.Windows.Visibility]::Visible
+}
+function global:LxHelpHide { $global:W.HelpOverlay.Visibility = [System.Windows.Visibility]::Collapsed }
 
 # ---------------------------------------------------------------- self test (no window)
 if ($Cfg.SelfTest) {
@@ -601,12 +726,16 @@ if ($Cfg.SelfTest) {
   $k = LxSortKids (LxChildren '.'); LxLog "root children (all): $($k -join ', ')"
   $G.W_ChunksOnly = $true; LxLog "root children (chunks): $((LxChildren '.') -join ', ')"
   foreach ($q in @('type:REPO', 'size>10GB', '"half-life"', 'flag:cold', 'fallout type:PROJECT', 'is:folder size>1GB depth<=3', 'archive files<500')) {
-    $r = LxSearch $q; LxLog ("search [{0}] -> {1} hits; first: {2}" -f $q, $r.Count, $(if ($r.Count) { "$($r[0].Rel) ($($r[0].Type))" } else { '-' }))
+    $r = @(LxSearch $q); LxLog ("search [{0}] -> {1} hits; first: {2}" -f $q, $r.Count, $(if ($r.Count) { "$($r[0].Rel) ($($r[0].Type))" } else { '-' }))
   }
   $any = @($G.Chunks.Keys)[0]
   foreach ($t in @(@('steamapps\common', 'Fallout%204/llms-txt.md'), @('steamapps\common', '_g01/llms-txt.md'), @('steamapps\common\_g01', '../Fallout%204/llms-txt.md'), @('steamapps', 'common/'), @('steamapps\common\Godot Engine', 'README.md'), @('.', 'nav:steamapps'))) {
     $r = LxResolveLink $t[0] $t[1]; LxLog ("link [{0}] + [{1}] -> {2} {3} {4}" -f $t[0], $t[1], $r.Kind, $r.Rel, $r.Group)
   }
+  $hb = LxMdBlocks (LxHelpText); $titles = @($hb | Where-Object { $_.Kind -in 'h1','h2','h3' } | ForEach-Object { (@($_.In | ForEach-Object { $_.Text }) -join '') })
+  LxLog "help: $($hb.Count) blocks, $($titles.Count) headings"
+  $bad = @(); foreach ($b in $hb) { foreach ($il in $b.In) { if ($il.K -eq 'l' -and $il.Url -like 'help:*') { $t = $il.Url.Substring(5); if (-not ($titles -contains $t)) { $bad += $t } } } }
+  LxLog "help links with no matching heading: $($bad.Count) $($bad -join ', ')"
   $rt = $G.Docs['.'].Text; $bl = LxMdBlocks $rt; LxLog "root doc blocks: $($bl.Count); kinds: $((@($bl | ForEach-Object { $_.Kind }) | Group-Object | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join ' ')"
   $first = @($bl | Where-Object { $_.Kind -eq 'li' } | Select-Object -First 1); if ($first) { LxLog ("first list item inlines: " + (($first[0].In | ForEach-Object { "$($_.K):$($_.Text)" }) -join ' | ')) }
   LxLog ((LxFactsText 'steamapps\common') -split "`n" | Select-Object -First 12 | Out-String)
@@ -627,6 +756,7 @@ $xamlText = @'
       <Button x:Name="BtnHome" Content="Home" Width="64" Margin="0,0,4,0" DockPanel.Dock="Left"/>
       <Button x:Name="BtnBack" Content="&lt; Back" Width="64" Margin="0,0,4,0" DockPanel.Dock="Left"/>
       <Button x:Name="BtnFwd" Content="Fwd &gt;" Width="64" Margin="0,0,4,0" DockPanel.Dock="Left"/>
+      <Button x:Name="BtnHelp" Content="Help (F1)" Width="78" Margin="0,0,4,0" DockPanel.Dock="Left"/>
       <ComboBox x:Name="CmbSort" DockPanel.Dock="Right" Width="110" SelectedIndex="0">
         <ComboBoxItem Content="Sort: size"/><ComboBoxItem Content="Sort: name"/>
       </ComboBox>
@@ -682,7 +812,8 @@ $xamlText = @'
             <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,6,0,0">
               <Button x:Name="BtnAsk" Content="Ask" Width="90" Margin="0,0,6,0"/>
               <Button x:Name="BtnCancel" Content="Cancel" Width="80" Margin="0,0,6,0"/>
-              <Button x:Name="BtnClearChat" Content="Clear chat" Width="90"/>
+              <Button x:Name="BtnClearChat" Content="Clear screen" Width="100" Margin="0,0,6,0" ToolTip="Clears the view like cls; scroll up to read earlier chat"/>
+              <Button x:Name="BtnEraseChat" Content="Erase history" Width="110"/>
             </StackPanel>
           </Grid>
         </TabItem>
@@ -705,6 +836,23 @@ $xamlText = @'
       </TabControl>
     </Grid>
     <TextBlock x:Name="TxtStatus" Grid.Row="3" Margin="2,6,2,0" TextTrimming="CharacterEllipsis"/>
+    <Grid x:Name="HelpOverlay" Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed" Background="#B0000000">
+      <Border x:Name="HelpPanel" Margin="50,30,50,30" Padding="8" CornerRadius="6" BorderThickness="1" BorderBrush="#808080">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <DockPanel Grid.Row="0" Margin="0,0,0,6">
+            <Button x:Name="BtnHelpClose" Content="Close (Esc)" DockPanel.Dock="Right" Width="100"/>
+            <TextBlock x:Name="HelpTitle" Text="llms-tree explorer - Help" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+          </DockPanel>
+          <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="5"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <ListBox x:Name="HelpToc" Grid.Column="0"/>
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"/>
+            <FlowDocumentScrollViewer x:Name="HelpViewer" Grid.Column="2" IsToolBarVisible="False"/>
+          </Grid>
+        </Grid>
+      </Border>
+    </Grid>
   </Grid>
 </Window>
 '@
@@ -722,10 +870,11 @@ if ($dark) { $pal = @{ Bg = '#1e1e1e'; Fg = '#e6e6e6'; Panel = '#2a2a2d'; Accent
 else { $pal = @{ Bg = '#ffffff'; Fg = '#1a1a1a'; Panel = '#f2f4f7'; Accent = '#00a0d8'; Dim = '#6b7280' } }
 $G.Theme = @{ Bg = (LxBrush $pal.Bg); Fg = (LxBrush $pal.Fg); Panel = (LxBrush $pal.Panel); Accent = (LxBrush $pal.Accent); Dim = (LxBrush $pal.Dim) }
 $win.Background = $G.Theme.Bg; $win.Foreground = $G.Theme.Fg
-foreach ($n in 'Tree', 'TxtFacts', 'TxtManifest', 'LvSearch', 'TxtTranscript', 'TxtQuestion', 'TxtSearch', 'TxtNote', 'TxtModel', 'DocViewer') {
+foreach ($n in 'Tree', 'TxtFacts', 'TxtManifest', 'LvSearch', 'TxtTranscript', 'TxtQuestion', 'TxtSearch', 'TxtNote', 'TxtModel', 'DocViewer', 'HelpToc', 'HelpViewer') {
   $el = $global:W[$n]; if ($el) { $el.Background = $G.Theme.Bg; $el.Foreground = $G.Theme.Fg }
 }
-foreach ($n in 'Crumb', 'TxtStatus') { $global:W[$n].Foreground = $G.Theme.Fg }
+foreach ($n in 'Crumb', 'TxtStatus', 'HelpTitle') { $global:W[$n].Foreground = $G.Theme.Fg }
+$global:W.HelpPanel.Background = $G.Theme.Bg
 
 # load data (console shows progress)
 LxLog "Loading run: $($Cfg.RunDir)"
@@ -766,8 +915,16 @@ $W.BtnClearSearch.Add_Click({ LxSafe { $global:W.TxtSearch.Text = ''; $global:W.
 $W.LvSearch.Add_MouseDoubleClick({ LxSafe { $sel = $global:W.LvSearch.SelectedItem; if ($sel) { LxNavigate ([string]$sel.Rel) $null $true $false; $global:W.Tabs.SelectedIndex = 0 } } })
 $W.BtnAsk.Add_Click({ LxSafe { LxAsk } })
 $W.BtnCancel.Add_Click({ LxSafe { LxCancelAsk } })
-$W.BtnClearChat.Add_Click({ LxSafe { $global:G.Chat.Clear(); $global:W.TxtTranscript.Clear() } })
+$W.BtnClearChat.Add_Click({ LxSafe { LxClearChat } })
+$W.BtnEraseChat.Add_Click({ LxSafe { LxEraseChat } })
+$W.TxtQuestion.Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Return' -and ([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control)) { $e.Handled = $true; LxSafe { LxAsk } } })
 $W.BtnSaveNote.Add_Click({ LxSafe { LxSaveNote } })
+$W.BtnHelp.Add_Click({ LxSafe { LxHelpShow } })
+$W.BtnHelpClose.Add_Click({ LxSafe { LxHelpHide } })
+$W.HelpToc.Add_SelectionChanged({ LxSafe { $it = $global:W.HelpToc.SelectedItem; if ($it -and $it.Tag) { $it.Tag.BringIntoView() } } })
+$win.Add_KeyDown({ param($s, $e) LxSafe {
+  if ($e.Key -eq 'F1') { LxHelpShow; $e.Handled = $true }
+  elseif ($e.Key -eq 'Escape' -and $global:W.HelpOverlay.Visibility -eq [System.Windows.Visibility]::Visible) { LxHelpHide; $e.Handled = $true } } })
 $W.BtnCopyPath.Add_Click({ LxSafe {
   $G = $global:G; $rel = $G.Cur.Rel; $p = $G.SourceRoot; if ($rel -ne '.') { $p = Join-Path $G.SourceRoot $rel }
   [System.Windows.Clipboard]::SetText($p); $global:W.TxtStatus.Text = "Copied: $p" } })
