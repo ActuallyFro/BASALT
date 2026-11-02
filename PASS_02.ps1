@@ -11,7 +11,7 @@
 #>
 
 # =====================================================================  VARIABLES (edit me)
-$RunDir          = 'C:\Users\zasz_\llms-out\20261031-124239'   # Pass 0 run folder (must contain folders.tsv AND classification.tsv from Pass 1)
+$RunDir          = 'C:\Users\zasz_\llms-out\20261101-211907'   # Pass 0 run folder (must contain folders.tsv AND classification.tsv from Pass 1)
 $DryRun          = $false                      # $false = actually write files
 $CleanTree       = $true                       # $true = delete the old <RunDir>\tree first (sidecar only) so renamed/stale files do not linger
 $LlmsFileName     = 'llms-txt.md'   # sidecar name (VS Code previews .md). Rename to 'llms.txt' at publish time if agents must fetch /llms.txt

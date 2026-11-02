@@ -5,7 +5,7 @@
 #>
 
 # =====================================================================  VARIABLES (edit me)
-$RunDir           = 'C:\Users\zasz_\llms-out\20261031-124239'
+$RunDir           = 'C:\Users\zasz_\llms-out\20261101-211907'
 $TreeSubdir       = 'tree'
 $ManifestFileName = 'llms-manifest.json'
 $LlmsFileName     = 'llms-txt.md'

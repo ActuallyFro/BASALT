@@ -11,7 +11,7 @@
 #>
 # =====================================================================  VARIABLES (edit me)
 $Cfg = @{
-  RunDir            = 'C:\Users\zasz_\llms-out\20261031-124239'
+  RunDir            = 'C:\Users\zasz_\llms-out\20261101-211907'
   TreeSubdir        = 'tree'
   LlmsFileName      = 'llms-txt.md'
   ManifestFileName  = 'llms-manifest.json'
@@ -27,7 +27,7 @@ $Cfg = @{
   TierColors        = @('#00b4f0','#70db43','#c8f000','#a000f0','#ff6666')   # depth 0,1,2,3,4+
   AskContextChars   = 12000
   AskHistoryTurns   = 3
-  Ollama            = @{ Mode = 'api'; Model = 'gemma4:latest'; Url = 'http://localhost:11434'; Think = $false
+  Ollama            = @{ Mode = 'api'; Model = 'gemma4:e2b'; Url = 'http://localhost:11434'; Think = $false
                          Temperature = 0.2; NumPredict = 700; TimeoutSec = 900; KeepAlive = '30m' }
   SelfTest          = $false
 }
