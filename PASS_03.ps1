@@ -11,7 +11,7 @@
 #>
 
 # =====================================================================  VARIABLES (edit me)
-$RunDir      = 'C:\Users\zasz_\llms-out\20261031-124239'   # Pass 0/1/2 run folder
+$RunDir      = 'C:\Users\zasz_\llms-out\20261101-211907'   # Pass 0/1/2 run folder
 $DryRun      = $false                                # $false = call the model and write summaries
 $Only        = ''                                   # '' = all chunks; or one chunk id, e.g. 'steamapps/common/Fallout 4'  (use '.' for the root)
 $Limit       = 0                                    # 0 = no limit; N = stop after N model calls (good for a first trial: 3)
@@ -19,7 +19,7 @@ $Redo        = $false                               # $true = also regenerate ch
 $SourceRoot  = ''                                   # '' = Root recorded in run.json; set if the drive letter/path changed
 
 $Mode        = 'api'                                # 'api' = REST (recommended) | 'cli' = pipe the prompt to `ollama run`
-$Model       = 'gemma4:latest'
+$Model       = 'gemma4:e2b'
 $OllamaUrl   = 'http://localhost:11434'
 $Think       = $false                               # --think=false
 $Temperature = 0.2

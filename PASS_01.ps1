@@ -7,7 +7,7 @@
 #>
 
 # =====================================================================  VARIABLES (edit me)
-$RunDir  = 'C:\Users\zasz_\llms-out\20261031-124239'     # the Pass 0 run folder that holds folders.tsv
+$RunDir  = 'C:\Users\zasz_\llms-out\20261101-211907'     # the Pass 0 run folder that holds folders.tsv
 $P = @{
   MinChunkBytes     = 500MB    # R-120  below this a folder is SUBSUMED (repos exempt)
   MaxLeafBytes      = 60GB     # R-125  non-stop folders at or below this close as a leaf (no deeper chunks)  <-- main granularity knob
@@ -17,6 +17,7 @@ $P = @{
   BulkShare         = 0.90     # R-130  dominant family share by FILE COUNT
   BlobShare         = 0.90     # R-135  dominant family share by BYTES when files < BulkMinFiles (few huge files)
   DatasetShare      = 0.60     # R-140  sdr+data family share by BYTES
+  DatasetMarkerShare= 0.30     # R-140  ... or: an SDR marker in THIS folder AND at least this sdr+data share
   MaxEntries        = 53       # R-210  first prime > 50 (checked in the summary)
   ColdAgeYears      = 5        # R-181
   TopN              = 25       # rows in the summary lists
@@ -24,7 +25,7 @@ $P = @{
 # markers that count as "strong" breadcrumbs for PROJECT (R-150). Others in the manifest are ignored here.
 $StrongMarkers       = @('Build')                       # own-folder marker categories
 $StrongReadmeNames   = @('readme.md','readme.txt','readme.rst','readme.markdown')   # bare 'README' is treated as noise
-$DatasetMarkers      = @('SDR')                          # SubMarkers categories that force DATASET
+$DatasetMarkers      = @('SDR')                          # marker categories (in the folder itself) that make DATASET likely
 $ExtFamilies = @{
   image   = '.png .jpg .jpeg .gif .bmp .tif .tiff .webp .heic .raw .cr2 .nef .dng .dds .tga .psd'
   video   = '.mp4 .mkv .avi .mov .wmv .m4v .webm .bik .bk2 .usm'
@@ -100,10 +101,10 @@ function Get-StopType($node) {
   $s = Get-Shares $node
   if ($node.SF -ge $P.BulkMinFiles -and $s.CShare -ge $P.BulkShare -and $noRepoBelow -and -not (Test-Noise $s.TopC)) {
     return @('OPAQUE-BULK','R-130', ("{0:P0} of {1:N0} files are {2}" -f $s.CShare, $node.SF, $s.TopC)) }
+  $hasDs = $false; foreach ($c in $DatasetMarkers) { if ($node.M.ContainsKey($c)) { $hasDs = $true } }
+  if ($noRepoBelow -and ($s.DShare -ge $P.DatasetShare -or ($hasDs -and $s.DShare -ge $P.DatasetMarkerShare))) { $why = ("sdr+data bytes {0:P0}" -f $s.DShare); if ($hasDs) { $why += ('; ' + ($DatasetMarkers -join ',') + ' marker in this folder') }; return @('DATASET','R-140', $why) }
   if ($node.SF -lt $P.BulkMinFiles -and $s.BShare -ge $P.BlobShare -and $noRepoBelow -and -not (Test-Noise $s.TopB)) {
     return @('BLOB','R-135', ("{0:P0} of bytes are {1} in only {2:N0} files" -f $s.BShare, $s.TopB, $node.SF)) }
-  $hasDs = $false; foreach ($c in $DatasetMarkers) { if ($node.SM.ContainsKey($c)) { $hasDs = $true } }
-  if ($s.DShare -ge $P.DatasetShare -or $hasDs) { return @('DATASET','R-140', ("sdr+data bytes {0:P0}; markers {1}" -f $s.DShare, ($DatasetMarkers -join ','))) }
   return $null
 }
 function Test-StrongProject($node) {
@@ -116,20 +117,20 @@ function Add-NestedRepos($node) {
 }
 function Add-NestedStops($node) {
   foreach ($k in $node.Kids) {
-    if ($k.SB -lt $P.MinChunkBytes -and -not $k.M.ContainsKey('Repo')) { continue }
+    if ($k.SB -lt $P.MinChunkBytes -and -not $k.SM.ContainsKey('Repo')) { continue }
     $st = Get-StopType $k
     if ($st -and ($st[0] -eq 'REPO' -or $k.SB -ge $P.NestedMinBytes)) { Add-Chunk $k ($st[0] + '(nested)') 'R-155' $st[2] } else { Add-NestedStops $k }
   }
 }
 # returns the chunk type of $node (or $null if SUBSUMED)
 function Invoke-Classify($node) {
-  if ($node.SB -lt $P.MinChunkBytes -and -not $node.M.ContainsKey('Repo')) { return $null }       # R-120
+  if ($node.SB -lt $P.MinChunkBytes -and -not $node.SM.ContainsKey('Repo')) { return $null }      # R-120 (a folder that contains a repo is never subsumed)
   $st = Get-StopType $node
   if ($st) { Add-Chunk $node $st[0] $st[1] $st[2]; return $st[0] }                                   # R-110/130/135/140
   if ($node.Depth -gt 0 -and (Test-StrongProject $node)) {                                           # R-150
     Add-Chunk $node 'PROJECT' 'R-150' ("breadcrumbs: markers={0} readmes={1}" -f (($node.M.Keys | Sort-Object) -join ','), $node.Readmes)
     Add-NestedStops $node; return 'PROJECT' }
-  if ($node.Depth -gt 0 -and $node.SB -le $P.MaxLeafBytes) {                                         # R-125
+  if ($node.Depth -gt 0 -and $node.SB -le $P.MaxLeafBytes -and [long]$node.SM['Repo'] -lt 2) {         # R-125 (two or more repos below: keep descending so each repo can be its own chunk)
     Add-Chunk $node 'MIXED-LEAF' 'R-125' ("<= MaxLeafBytes ({0:N1} GB)" -f ($node.SB / 1GB)); Add-NestedRepos $node; return 'MIXED-LEAF' }
   $idx = $script:Out.Count; $script:Out.Add($null); $mark = $script:Out.Count
   $sig = 0; $sigTypes = @()
@@ -149,7 +150,7 @@ function Invoke-Classify($node) {
 }
 
 $null = Invoke-Classify $N['.']
-$chunks = @($script:Out | Where-Object { $_ -ne $null })
+$chunks = @($script:Out | Where-Object { $_ -ne $null } | Sort-Object { $_.Rel })   # stable order (root first) so runs can be diffed
 
 # ---------------------------------------------------------------- outputs
 $tsv = Join-Path $RunDir 'classification.tsv'
