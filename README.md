@@ -1,8 +1,8 @@
-# llms-tree
+# BASALT - Bottom-up Aggregation, Semantic Annotation, LLM-readable Trees
 
 **Turn a terabyte of unlabelled storage into a navigable tree of small, LLM-friendly index files. Read-only, deterministic, and built entirely from the tools already on a Windows machine (PowerShell 5.1).**
 
-`llms-tree` walks a large, heterogeneous file share, decides *where the meaningful boundaries are* (repositories, projects, datasets, piles of media), writes a small [`llms.txt`-style](#references) index page for each boundary, and optionally asks a local language model to write a short summary of each one. The result is a tree of tiny, linked pages that a human or an AI agent can read from the top and drill down, instead of facing a million-file directory listing.
+`BASALT` walks a large, heterogeneous file share, decides *where the meaningful boundaries are* (repositories, projects, datasets, piles of media), writes a small [`llms.txt`-style](#references) index page for each boundary, and optionally asks a local language model to write a short summary of each one. The result is a tree of tiny, linked pages that a human or an AI agent can read from the top and drill down, instead of facing a million-file directory listing.
 
 > [!IMPORTANT]
 > **Your data is never modified.** Every script is read-only with respect to the folder being scanned. All output goes to a separate *sidecar* run folder. See [Safety guarantees](#safety-guarantees).
@@ -28,7 +28,7 @@ flowchart LR
 
 ### The idea in one paragraph
 
-A flat list of a million files is useless to a person and too big for a model. But storage is *structured*: a folder with a `.git` directory is one repository; a folder of 800 numbered PNGs is one art collection; a folder with six 4 GB `.sigmf-data` files is one radio dataset. `llms-tree` measures each folder's cheap signals (names, sizes, dates, extension mix, marker files) once, bottom-up; applies explicit, tunable rules top-down to decide where to **stop descending and call something a chunk**; and writes one small page per chunk. Parents summarise their children, so the tree is an *index of indexes*. Files are described in aggregate ("840 images, 4.7 GB") rather than listed, and a language model is only used at the very end, on a bounded amount of text, to describe what is already known.
+A flat list of a million files is useless to a person and too big for a model. But storage is *structured*: a folder with a `.git` directory is one repository; a folder of 800 numbered PNGs is one art collection; a folder with six 4 GB `.sigmf-data` files is one radio dataset. `BASALT` measures each folder's cheap signals (names, sizes, dates, extension mix, marker files) once, bottom-up; applies explicit, tunable rules top-down to decide where to **stop descending and call something a chunk**; and writes one small page per chunk. Parents summarise their children, so the tree is an *index of indexes*. Files are described in aggregate ("840 images, 4.7 GB") rather than listed, and a language model is only used at the very end, on a bounded amount of text, to describe what is already known.
 
 ```mermaid
 flowchart LR
@@ -82,7 +82,7 @@ What you will see after step 3, on the fictional example share used throughout t
 
 ```text
 Loaded 28 folders, 13 chunks.
-llms-tree Pass 2 WRITE   chunks=13  emitted=13  collapsed wrappers=0  group files=0
+BASALT Pass 2 WRITE   chunks=13  emitted=13  collapsed wrappers=0  group files=0
 files to write: 13 llms-txt.md (incl. groups) + 13 llms-manifest.json
 max links in one file: 6  (cap 53)
 validation problems: 0
@@ -99,13 +99,8 @@ Wrote sidecar tree: C:\Users\you\llms-out\20261101-174700\tree
 | Nothing is deleted from your data | Passes only ever delete their own sidecar `tree/` folder (Pass 2, `$CleanTree`) |
 | Re-runs are safe | Each Pass 0 run gets a new time-stamped folder; later passes overwrite their own outputs |
 
-## Extension-family inventory
-
-Pass 1 and Pass 2 use the same curated extension map. It covers common raster/vector images, video and audio, office and publishing documents, compressed/container formats, SDR and scientific/tabular data, source languages, configuration and web assets, databases, 2D/3D design and CAD, GIS, ML models, binaries/packages, subtitles/playlists, email/calendar/contact files, localization, logs, and network captures. This is a practical inventory, not an exhaustive registry of every format.
-
-Family names are exclusive: each listed suffix maps to one family. Ambiguous generic suffixes such as `.bin` and `.dat` are deliberately not assigned because extensions alone cannot identify their contents. `data` remains limited to recognized scientific/tabular dataset formats (and the existing `.sqlite`/`.sqlite3` mapping); `database` is separate and does not contribute to R-140's `DatasetShare`. New `data` entries do contribute, so R-140 remains a suffix-based heuristic rather than content detection.
-
-## 3. Result on your manifest (MaxLeafBytes 20 GB, SigShare 0.10)
+> [!NOTE]
+> All example output in this document comes from a **fictional game studio's share** ("Brightmoor Studio") built for this README and run through the real scripts. Summaries in the examples are *illustrative*: a stand-in replaced the language model, and real model output will differ in wording. Where a real-world result is quoted (a 518 GB game library with 15,400 folders), it is labelled as such.
 
 ## Table of contents
 
@@ -247,7 +242,7 @@ If the second command lists your model, the scripts' default settings will work.
 The scripts keep a `.txt` extension on purpose: they are meant to be pasted, not executed.
 
 ```text
-llms-tree/
+BASALT/
 |-- README.md
 `-- scripts/
     |-- pass0-inventory.txt         Pass 0
@@ -274,7 +269,7 @@ A 1 TB research and engineering share breaks the obvious approach in three ways:
 2. **Heterogeneity.** The same share may hold a game engine repository, 800 concept-art images, radio-telescope style IQ recordings, MATLAB models and a folder of 2019 build zips. No single rule ("one page per folder", "one page per N files") describes all of those sensibly.
 3. **Unknown contents.** Nothing is labelled. Reading everything to find out is exactly the cost we are trying to avoid.
 
-`llms-tree` answers with **a tree of small pages whose boundaries are chosen by explicit heuristics over cheap metadata**, as the next sections explain.
+`BASALT` answers with **a tree of small pages whose boundaries are chosen by explicit heuristics over cheap metadata**, as the next sections explain.
 
 ### Design principles
 
@@ -638,7 +633,7 @@ A new marker category matters only if a later pass is told to trust it. Pass 1 t
 ```text
 PS D:\> # ...paste pass1-classify.txt with $RunDir = 'C:\Users\you\llms-out\20261101-174700'...
 Loaded 28 folders.
-llms-tree Pass 1 dry run   folders=28   chunks=13   (28 manifest rows)
+BASALT Pass 1 dry run   folders=28   chunks=13   (28 manifest rows)
 
 --- chunks by type
 REPO                   6          6.3 GB
@@ -737,7 +732,7 @@ Links are **relative and written as if the file lived in the source folder** (`A
 ```text
 PS D:\> # ...paste pass2-emit.txt with $RunDir set; $DryRun is $true by default...
 Loaded 28 folders, 13 chunks.
-llms-tree Pass 2 DRY RUN (nothing written)   chunks=13  emitted=13  collapsed wrappers=0  group files=0
+BASALT Pass 2 DRY RUN (nothing written)   chunks=13  emitted=13  collapsed wrappers=0  group files=0
 files to write: 13 llms-txt.md (incl. groups) + 13 llms-manifest.json
 max links in one file: 6  (cap 53)
 validation problems: 0
@@ -788,7 +783,7 @@ Not listed: 1 smaller subfolder(s) totalling 198 B, and 2 loose file(s) (65 B) d
 ## Subfolders
 - [Content](Content/): 5.6 GB, 3 files, .pak 90 %, .bk2 10 %
 
-<!-- generated by llms-tree pass2 0.2; summary by gemma4:latest on 2026-11-01 -->
+<!-- generated by BASALT pass2 0.2; summary by gemma4:latest on 2026-11-01 -->
 ```
 
 | Part | Source |
@@ -841,7 +836,7 @@ The **root page** is the entry point; its `## Chunks` list is the "table of cont
   "flags": [],
   "treeSig": "90EAAB73C89BA939",
   "summary": "TODO",
-  "generator": "llms-tree pass2 0.2",
+  "generator": "BASALT pass2 0.2",
   "links": 2
 }
 ```
@@ -1339,114 +1334,22 @@ Not built yet, in rough order of value:
 
 | Term | Meaning |
 |---|---|
-| **Chunk** | A folder that gets its own page and manifest. The unit of indexing |
-| **Sidecar / run folder** | The separate, time-stamped output folder; the only place written |
-| **Manifest** | Either `folders.tsv` (the Pass 0 table, one row per folder) or a chunk's `llms-manifest.json` |
-| **Marker / breadcrumb** | A file or folder name that hints at what a folder is (`.git`, `pyproject.toml`, `*.sigmf-meta`, `README.md`) |
-| **Extension family** | A named group of extensions (image, video, archive, sdr, data, ...) used to measure what a folder is "mostly" made of |
-| **Stop type** | A classification (`REPO`, `OPAQUE-BULK`, `DATASET`, `BLOB`, `PROJECT`, `MIXED-LEAF`) at which the walk stops descending |
-| **Subsumed** | Too small to deserve a page; mentioned by its parent instead |
-| **Container / wrapper** | A chunk whose value is its child chunks / a pass-through folder around a single larger one |
-| **Depth-first search (DFS)** | Visiting a tree by following each branch to its end before the next |
-| **Post-order / pre-order** | Processing a folder after / before its children |
-| **Merkle tree** | A tree in which each node's hash covers its children's hashes, so a change anywhere shows up in every ancestor |
-| **`DirSig` / `TreeSig`** | A folder's own fingerprint / the fingerprint of its whole subtree |
-| **Fan-out** | Number of links on a page (here capped at 53) |
-| **Group page (`_gNN`)** | A virtual page that lists part of a chunk's children when there are too many for one page |
-| **Evidence pack** | The bounded text given to the model for one chunk |
-| **LPG** | Labelled property graph: nodes and edges that carry properties; the format the graph editor loads |
-| **Paste block** | A script written as one `& { ... }` expression, run by pasting it into the console |
-| **STA** | Single-threaded apartment, the threading mode WPF needs |
-| **Reparse point** | A symbolic link or junction; never followed |
-| **UNC path** | A network path such as `\\server\share\folder` |
-| **Dry run** | A run that prints what it would do and writes nothing |
+| R-120 | Unchanged: `SubBytes < MinChunkBytes` (500 MB) gives SUBSUMED. Repos are exempt. |
+| **R-125 (new)** | **`MaxLeafBytes` (default 20 GB):** a non-stop folder at or below this size closes as `MIXED-LEAF`, and no deeper chunks are emitted (nested repos still are). This is the main granularity dial. Under the real manifest: 5 GB gives 124 chunks, 10 GB gives 97, **20 GB gives 64**, 60 GB gives 37. |
+| **R-135 (new)** | `BLOB`: fewer than `BulkMinFiles` files, but at least `BlobShare` (0.90) of **bytes** in one family. This catches the few-huge-files case (RDR2, DuneAwakening). |
+| R-140 | `data` family narrowed (`.bin .dat .raw` removed, as games use them). `DatasetShare` 0.60 by bytes, or an `SDR` marker. |
+| R-150 | PROJECT only on a strong marker (`Build`, or a strict README name). |
+| **R-155 (new)** | Inside a closed PROJECT, nested stop-type chunks are kept only if at least `NestedMinBytes` (5 GB). Nested repos are always kept. |
+| **R-160 (revised)** | A folder is `CONTAINER` only if at least **2 significant children** exist (each child holds at least `SigShare` = 10% of the parent's bytes and is itself a chunk). A single significant child that is itself a container makes the parent a `WRAPPER` (pass-through). Otherwise the folder closes as a `MIXED-LEAF` (R-170). Without this, v0.1 produced 234 chunks of single-child wrapper chains such as `Game\Game_Data\...`. |
 
-[Back to top](#table-of-contents)
+## 3. Result on your manifest (MaxLeafBytes 20 GB, SigShare 0.10)
 
----
+64 chunks from 15,400 folders: 40 MIXED-LEAF, 6 BLOB, 6 WRAPPER, 5 CONTAINER, 3 OPAQUE-BULK, 3 PROJECT, 1 REPO. No fan-out violations. See `sample-classification-from-your-manifest.tsv`.
 
-## FAQ
+## 4. Known gaps for v0.3
 
-**Why paste blocks instead of `.ps1` scripts?** Many locked-down environments cannot run script files. A single expression pasted into a console runs under the same user rights without touching execution policy.
-
-**Why a separate sidecar folder?** So the tool can never alter, clutter or slow the data it describes, and so a run can be deleted without consequence. A later "publish" step (see the [roadmap](#roadmap)) would be a separate, explicit action.
-
-**Does it read my files?** Passes 0 to 2, Post 01 and Post 02 do not read file contents (optional header sniffing excepted, off by default, 512 bytes). Pass 3 reads the first lines of a few README and text files per chunk.
-
-**What leaves my machine?** Nothing, unless you point the model URL elsewhere. Pass 3 and the explorer's Ask tab send text to `http://localhost:11434` by default.
-
-**Why 53 links?** It is the first prime above 50, chosen as a bound small enough to sit comfortably in a model's context. It is a variable.
-
-**Does the share have to be quiet while it scans?** No, but a moving target gives a slightly inconsistent snapshot. The fingerprints let you detect which branches changed and re-run.
-
-**Can I use the pages as a real `/llms.txt` on a website?** The format matches; rename the pages (see [Pages named `llms.txt`](#pages-named-llmstxt)) and copy them where the site serves them. The sidecar-only `_gNN` pages and the source-relative README links need attention first.
-
-**Linux or macOS?** Not a target. Pass 1 to 3 logic runs on PowerShell 7, but Pass 0 and the explorer are Windows-specific.
-
-**How big is the output?** `folders.tsv` holds one line per folder (a few hundred bytes each). Pages are a few KB. Even for a very large share the run folder is small compared with the data.
-
-[Back to top](#table-of-contents)
-
----
-
-## Troubleshooting
-
-| Symptom | Likely cause | What to do |
-|---|---|---|
-| `OutRoot (...) is inside the scanned Root` | The sidecar location is under the folder being scanned | Set `$OutRoot` to a path outside it |
-| `folders.tsv not found in ...` / `classification.tsv not found` | Wrong `$RunDir`, or a previous pass has not run | Point `$RunDir` at the *time-stamped* folder; run Pass 1 before Pass 2 |
-| Console seems frozen during Pass 0 | A large crawl is working; output arrives as a heartbeat every 20 seconds | Wait; press Ctrl+C to stop safely and resume later with `$RunDir` |
-| Pasted script is truncated or has odd characters | The terminal mangled a large paste | Use `Get-Content -Raw .\file.txt \| Invoke-Expression` |
-| Almost everything is one chunk | A top-level folder matched a stop rule (see the `Why` column) | Lower `MaxLeafBytes` or the share thresholds; see [the recipe](#keep-small-siblings-visible-next-to-a-huge-dataset) |
-| A folder I care about has no page | It is `SUBSUMED` (under 500 MB) or inside a closed chunk | Lower `MinChunkBytes` or `MaxLeafBytes` in Pass 1; the parent's page still lists it |
-| Links to a README do not open in the explorer | By design: source files are not in the run folder | Open the source path (Notes tab: *Open source folder*) |
-| `Ollama preflight failed ... Connection refused` | Ollama is not running, or the URL is wrong | Start Ollama; check `$OllamaUrl` |
-| `Model '...' is not in 'ollama list'` | Wrong model name | Use a name from `ollama list` |
-| Summaries missing or marked `FAILED` | Empty or too-short model answers | Raise `$NumPredict`; try `$Think = $true`; switch `$Mode` to `'cli'`; check `pass3-log.tsv` |
-| Page already summarised, change not applied | Pass 3 skips finished pages | Set `$Redo = $true` (optionally with `$Only`) |
-| Explorer window closes or shows `ERROR:` in the status bar | An unexpected condition in a handler | Copy the message from the status bar or console; run once with `SelfTest = $true` to check the data layer |
-| Explorer tree is empty | `RunDir` lacks `folders.tsv` or `tree\` | Run Passes 0 to 2 first |
-
-[Back to top](#table-of-contents)
-
----
-
-## Versions and changelog
-
-| Component | Version | Notes |
-|---|---|---|
-| Pass 0 Inventory | 0.1.1 | Resumable crawl; fingerprints; marker and crumb tables |
-| Pass 1 Classify | 0.2 | Granularity dial, significance rule, blob/dataset rules |
-| Pass 2 Emit | 0.2 | Link budget, groups, wrapper collapse, validation |
-| Pass 3 Summarize | 0.2 | Evidence budget, deepest-first, retries, Ollama api/cli |
-| Post 01 Mega manifest | 0.1 | Gap-filling graph export |
-| Post 02 Explorer | 0.1 | WPF explorer with search, Ask, Notes, Help |
-
-**Highlights of the development history** (newest first):
-
-* Pass 1: a folder that *contains* a repository is never subsumed; two or more repositories below keep a folder open; `DATASET` now needs the SDR marker in the folder itself plus a data-byte share (a single radio file used to turn a whole share into one dataset); `DATASET` is tested before `BLOB`; output is sorted for stable diffs.
-* Explorer: help overlay, `cls`-style chat clearing, auto-clearing question box, fixes for single-result search handling.
-* Pass 3: README-class files get long excerpts and other files short ones; subfolder names added to the evidence; the prompt tells the model that excerpts may be incidental.
-* Pass 2: links escape `( ) ' ! *` explicitly (Windows PowerShell 5.1 does not); `$CleanTree`; page and manifest names are variables.
-* Compatibility: all scripts avoid hashtable-by-property-name cmdlet calls that behave differently in Windows PowerShell 5.1.
-* Pass 0: first release; hidden and reparse handling; header sniffing; resume.
-
-[Back to top](#table-of-contents)
-
----
-
-## References
-
-[^cormen]: T. H. Cormen, C. E. Leiserson, R. L. Rivest and C. Stein, *Introduction to Algorithms* (MIT Press), the chapter on elementary graph algorithms: depth-first search, discovery and finishing times.
-[^merkle]: R. C. Merkle, "A Digital Signature Based on a Conventional Encryption Function", in *Advances in Cryptology: CRYPTO '87*, Lecture Notes in Computer Science 293, Springer, 1988. The hash-tree construction.
-[^sitemaps]: Sitemaps protocol, <https://www.sitemaps.org/protocol.html>.
-[^rfc8615]: M. Nottingham, "Well-Known Uniform Resource Identifiers (URIs)", RFC 8615, IETF, 2019.
-
-* The `llms.txt` proposal (format, motivation, example): J. Howard, *The /llms.txt file*, v2, 2024-09-03; discussion and source at <https://github.com/AnswerDotAI/llms-txt>.
-* Ollama API: <https://github.com/ollama/ollama/blob/main/docs/api.md>.
-* Windows Presentation Foundation (WPF) documentation: <https://learn.microsoft.com/dotnet/desktop/wpf/>.
-* Maximum path length and the `\\?\` prefix: <https://learn.microsoft.com/windows/win32/fileio/maximum-file-path-limitation>.
-* SigMF (signal metadata format whose `.sigmf-data` / `.sigmf-meta` pairs are used as the example dataset): <https://github.com/sigmf/SigMF>.
-* Mermaid diagram syntax used in this document: <https://mermaid.js.org>.
-
-[Back to top](#table-of-contents)
+1. **WRAPPER chains** (for example `SpaceEngineers2\GameData\Vanilla`) should collapse into one pass-through entry.
+2. The `ColdAgeYears` flag is untested here (all data is recent), as are the `Archive`/`Temp` crumbs.
+3. `bin`/`obj` exclusions understate sizes. Consider a config switch to measure but not describe them.
+4. R-211 virtual grouping for more than 53 children is specified but not implemented. This sample never triggers it.
+5. Pass 2 (emit `llms.txt` and `llms-manifest.json`) is next, followed by the Pass 3 LLM fill.

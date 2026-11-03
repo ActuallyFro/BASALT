@@ -1,6 +1,6 @@
 & {
 <#
-  llms-tree  Pass 3  -  SUMMARIZE with a local Ollama model. Replaces "> TODO-SUMMARY" in the sidecar llms.txt files.
+  BASALT  Pass 3  -  SUMMARIZE with a local Ollama model. Replaces "> TODO-SUMMARY" in the sidecar llms.txt files.
   PASTE-ABLE: no param(), no .ps1 needed. Edit VARIABLES, paste all.
   Reads : <RunDir>\pass2-index.tsv, <RunDir>\tree\...\llms.txt + llms-manifest.json  (Pass 2 output)
           + a few small text files from the SOURCE tree (README etc: first $HeadLines lines / $HeadMaxBytes bytes each)
