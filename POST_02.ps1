@@ -1,6 +1,6 @@
 & {
 <#
-  llms-tree  EXPLORER  -  native WPF window (Windows PowerShell 5.1, default .NET only; no server, no WinForms, no HTA, no HTML).
+  BASALT  EXPLORER  -  native WPF window (Windows PowerShell 5.1, default .NET only; no server, no WinForms, no HTA, no HTML).
   PASTE-ABLE: edit $Cfg.RunDir, paste. The console stays busy while the window is open; close the window to return.
   Reads ONLY files inside the run folder:  folders.tsv, tree\**\llms-txt.md + llms-manifest.json, run.json, annotations.json
   Writes ONLY <RunDir>\annotations.json (stars / reviewed / notes), when you press Save in the Notes tab.
@@ -11,7 +11,7 @@
 #>
 # =====================================================================  VARIABLES (edit me)
 $Cfg = @{
-  RunDir            = 'C:\Users\zasz_\llms-out\20261101-211907'
+  RunDir            = 'C:\Users\zasz_\llms-out\20261102-221000'
   TreeSubdir        = 'tree'
   LlmsFileName      = 'llms-txt.md'
   ManifestFileName  = 'llms-manifest.json'
@@ -610,8 +610,8 @@ function global:LxCancelAsk {
 
 
 function global:LxHelpText { return @'
-# llms-tree explorer
-A read-only explorer for one finished llms-tree run. It shows the folders found by Pass 0, the chunks chosen by Pass 1, the index pages written by Pass 2 and the summaries written by Pass 3. It only reads files inside the run folder. The one thing it can write is annotations.json (your stars and notes).
+# BASALT explorer
+A read-only explorer for one finished BASALT run. It shows the folders found by Pass 0, the chunks chosen by Pass 1, the index pages written by Pass 2 and the summaries written by Pass 3. It only reads files inside the run folder. The one thing it can write is annotations.json (your stars and notes).
 ## Quick start
 - Click a folder in the tree on the left. Its index page appears on the right.
 - Click blue links in the page to jump to a chunk or folder. Links to source files (for example a README) are shown as unavailable because source files are outside the run folder.
@@ -747,7 +747,7 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
 $xamlText = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="llms-tree explorer" Width="1400" Height="860" WindowStartupLocation="CenterScreen">
+        Title="BASALT explorer" Width="1400" Height="860" WindowStartupLocation="CenterScreen">
   <Grid Margin="6">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
@@ -842,7 +842,7 @@ $xamlText = @'
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <DockPanel Grid.Row="0" Margin="0,0,0,6">
             <Button x:Name="BtnHelpClose" Content="Close (Esc)" DockPanel.Dock="Right" Width="100"/>
-            <TextBlock x:Name="HelpTitle" Text="llms-tree explorer - Help" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+            <TextBlock x:Name="HelpTitle" Text="BASALT explorer - Help" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
           </DockPanel>
           <Grid Grid.Row="1">
             <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="5"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -882,7 +882,7 @@ LxLoad
 $G.W_ChunksOnly = [bool]$Cfg.StartChunksOnly; $G.W_SortName = $false
 $global:W.ChkChunks.IsChecked = $G.W_ChunksOnly
 $global:W.TxtModel.Text = $Cfg.Ollama.Model
-$global:W.Win.Title = "llms-tree explorer - $($G.RootName)"
+$global:W.Win.Title = "BASALT explorer - $($G.RootName)"
 $global:W.TxtTranscript.Text = "Ask questions about the folder you have selected. The text sent to Ollama is the index data inside the run folder (facts, llms page, child summaries, optional search hits), capped at $($Cfg.AskContextChars) characters.`r`n" + ('-' * 60) + "`r`n"
 
 # events

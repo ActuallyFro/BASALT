@@ -1,6 +1,6 @@
 & {
 <#
-  llms-tree  Passes 0-2 + POST 01  -  inventory, classify, emit, and export an LPG graph (PowerShell 5.1).
+  BASALT  Passes 0-2 + POST 01  -  inventory, classify, emit, and export an LPG graph (PowerShell 5.1).
   PASTE-ABLE: no param(), no .ps1 needed. Edit the VARIABLES block, cd to the folder to scan, paste all.
   Pass 2 writes by default; set $DryRun = $true to preview. $CleanTree removes only the sidecar tree in this run folder.
   Output (sidecar, never inside the scanned tree):
@@ -551,7 +551,7 @@ $chunks | Select-Object Rel, Depth, Type, Rule, @{n='GB';e={[math]::Round($_.Byt
   Export-Csv -LiteralPath $classificationPath -Delimiter "`t" -NoTypeInformation -Encoding UTF8
 
 $summary = New-Object 'System.Collections.Generic.List[string]'
-$summary.Add("llms-tree Pass 1   folders=$($N.Count)   chunks=$($chunks.Count)   ($($rows.Count) manifest rows)")
+$summary.Add("BASALT Pass 1   folders=$($N.Count)   chunks=$($chunks.Count)   ($($rows.Count) manifest rows)")
 $summary.Add('Params: ' + (($P.Keys | Sort-Object | ForEach-Object { "$_=$($P[$_])" }) -join '  '))
 $summary.Add(''); $summary.Add('--- chunks by type')
 $chunks | Group-Object Type | Sort-Object Count -Descending | ForEach-Object {
@@ -586,7 +586,7 @@ Write-Host "Wrote $classificationPath"
 $LlmsFileName = $Config.LlmsFileName
 $ManifestFileName = $Config.ManifestFileName
 $MaxEntries = [int]$P.MaxEntries
-$Generator = 'llms-tree pass2 0.2'
+$Generator = 'BASALT pass2 0.2'
 $G = $MaxEntries - $ReserveEntries
 $rootName = 'root'
 if ($runInfo.Root) {
@@ -865,7 +865,7 @@ foreach ($file in $Files) {
 
 $llmsFiles = @($Files | Where-Object { $_.Name -eq $LlmsFileName })
 $report = New-Object 'System.Collections.Generic.List[string]'
-$report.Add("llms-tree Pass 2 $(if ($DryRun) { 'DRY RUN (nothing written)' } else { 'WRITE' })  chunks=$($ChunkMap.Count)  emitted=$($ChunkMap.Count - $script:collapsedCount)  collapsed wrappers=$($script:collapsedCount)  group files=$($script:groupCount)")
+$report.Add("BASALT Pass 2 $(if ($DryRun) { 'DRY RUN (nothing written)' } else { 'WRITE' })  chunks=$($ChunkMap.Count)  emitted=$($ChunkMap.Count - $script:collapsedCount)  collapsed wrappers=$($script:collapsedCount)  group files=$($script:groupCount)")
 $report.Add("files to write: $($llmsFiles.Count) $LlmsFileName (incl. groups) + $(@($Files | Where-Object { $_.Name -eq $ManifestFileName }).Count) $ManifestFileName")
 $report.Add("max links in one file: $(($llmsFiles | ForEach-Object { $_.Links } | Measure-Object -Maximum).Maximum)  (cap $MaxEntries)")
 $report.Add("validation problems: $($Problems.Count)")

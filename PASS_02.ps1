@@ -1,6 +1,6 @@
 & {
 <#
-  llms-tree  Pass 2  -  EMIT llms.txt + llms-manifest.json into the SIDECAR tree. Reads Pass 0 + Pass 1 output only.
+  BASALT  Pass 2  -  EMIT llms.txt + llms-manifest.json into the SIDECAR tree. Reads Pass 0 + Pass 1 output only.
   PASTE-ABLE: no param(), no .ps1 needed. Edit VARIABLES, paste all.
   $DryRun = $true (default) writes NOTHING: it prints a plan, validation results and sample renderings.
   Writes (when $DryRun = $false):  <RunDir>\tree\<same relative path>\llms.txt + llms-manifest.json
@@ -35,7 +35,7 @@ $ExtFamilies = @{
 # =====================================================================  END VARIABLES
 
 $ErrorActionPreference = 'Stop'
-$Generator = 'llms-tree pass2 0.2'
+$Generator = 'BASALT pass2 0.2'
 $fam = @{}
 foreach ($f in $ExtFamilies.Keys) { foreach ($e in $ExtFamilies[$f].Split(' ', [StringSplitOptions]::RemoveEmptyEntries)) { $fam[$e] = $f } }
 $G = $MaxEntries - $ReserveEntries
@@ -233,7 +233,7 @@ foreach ($f in $Files) {
 }
 $llmsFiles = @($Files | Where-Object { $_.Name -eq $LlmsFileName })
 $report = New-Object 'System.Collections.Generic.List[string]'
-$report.Add("llms-tree Pass 2 $(if ($DryRun) { 'DRY RUN (nothing written)' } else { 'WRITE' })  chunks=$($ChunkMap.Count)  emitted=$($ChunkMap.Count - $script:collapsedCount)  collapsed wrappers=$($script:collapsedCount)  group files=$($script:groupCount)")
+$report.Add("BASALT Pass 2 $(if ($DryRun) { 'DRY RUN (nothing written)' } else { 'WRITE' })  chunks=$($ChunkMap.Count)  emitted=$($ChunkMap.Count - $script:collapsedCount)  collapsed wrappers=$($script:collapsedCount)  group files=$($script:groupCount)")
 $report.Add("files to write: $($llmsFiles.Count) $LlmsFileName (incl. groups) + $(@($Files | Where-Object { $_.Name -eq $ManifestFileName }).Count) $ManifestFileName")
 $report.Add("max links in one file: $(($llmsFiles | ForEach-Object { $_.Links } | Measure-Object -Maximum).Maximum)  (cap $MaxEntries)")
 $report.Add("validation problems: $($Problems.Count)"); foreach ($p in $Problems) { $report.Add("  - $p") }

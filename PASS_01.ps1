@@ -1,6 +1,6 @@
 & {
 <#
-  llms-tree  Pass 1  -  CLASSIFY (dry run). Reads folders.tsv from Pass 0, touches NO data files.
+  BASALT  Pass 1  -  CLASSIFY (dry run). Reads folders.tsv from Pass 0, touches NO data files.
   PASTE-ABLE: no param(), no .ps1 needed. Edit VARIABLES, paste all.
   Writes next to folders.tsv:  classification.tsv  (every chunk + rule + reason)
                                classification-summary.txt  (counts, biggest chunks, tuning hints)
@@ -158,7 +158,7 @@ $chunks | Select-Object Rel, Depth, Type, Rule, @{n='GB';e={[math]::Round($_.Byt
   Export-Csv -LiteralPath $tsv -Delimiter "`t" -NoTypeInformation -Encoding UTF8
 
 $sum = New-Object 'System.Collections.Generic.List[string]'
-$sum.Add("llms-tree Pass 1 dry run   folders=$($N.Count)   chunks=$($chunks.Count)   ($($rows.Count) manifest rows)")
+$sum.Add("BASALT Pass 1 dry run   folders=$($N.Count)   chunks=$($chunks.Count)   ($($rows.Count) manifest rows)")
 $sum.Add("Params: " + (($P.Keys | Sort-Object | ForEach-Object { "$_=$($P[$_])" }) -join '  '))
 $sum.Add(''); $sum.Add('--- chunks by type')
 $chunks | Group-Object Type | Sort-Object Count -Descending | ForEach-Object { $sum.Add(("{0,-18}{1,6}   {2,10:N1} GB" -f $_.Name, $_.Count, (($_.Group | Measure-Object Bytes -Sum).Sum / 1GB))) }

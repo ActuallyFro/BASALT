@@ -1,6 +1,6 @@
 & {
 <#
-  llms-tree GAP-FILLING MEGA MANIFEST & LPG WEBAPP CONVERTER (PowerShell 5.1)
+  BASALT GAP-FILLING MEGA MANIFEST & LPG WEBAPP CONVERTER (PowerShell 5.1)
   Fixed root ID mapping so all top-level clusters correctly anchor to 'llms-root'.
 #>
 

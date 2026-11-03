@@ -1,6 +1,6 @@
 & {
 <#
-  llms-tree  Pass 0  -  read-only, resumable folder inventory (PowerShell 5.1, default tools only).
+  BASALT  Pass 0  -  read-only, resumable folder inventory (PowerShell 5.1, default tools only).
   PASTE-ABLE: no param(), no .ps1 needed. Edit the VARIABLES block, cd to the folder to scan, paste all.
   Output (sidecar, never inside the scanned tree):
     <OutRoot>\<yyyyMMdd-HHmmss>\ run.json config.json folders.tsv extensions.tsv skipped.tsv errors.tsv
