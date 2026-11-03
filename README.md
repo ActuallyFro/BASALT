@@ -27,6 +27,12 @@ Tuned against your first real manifest: `folders.tsv`, 15,400 folders, 228,901 f
 | **R-155 (new)** | Inside a closed PROJECT, nested stop-type chunks are kept only if at least `NestedMinBytes` (5 GB). Nested repos are always kept. |
 | **R-160 (revised)** | A folder is `CONTAINER` only if at least **2 significant children** exist (each child holds at least `SigShare` = 10% of the parent's bytes and is itself a chunk). A single significant child that is itself a container makes the parent a `WRAPPER` (pass-through). Otherwise the folder closes as a `MIXED-LEAF` (R-170). Without this, v0.1 produced 234 chunks of single-child wrapper chains such as `Game\Game_Data\...`. |
 
+## Extension-family inventory
+
+Pass 1 and Pass 2 use the same curated extension map. It covers common raster/vector images, video and audio, office and publishing documents, compressed/container formats, SDR and scientific/tabular data, source languages, configuration and web assets, databases, 2D/3D design and CAD, GIS, ML models, binaries/packages, subtitles/playlists, email/calendar/contact files, localization, logs, and network captures. This is a practical inventory, not an exhaustive registry of every format.
+
+Family names are exclusive: each listed suffix maps to one family. Ambiguous generic suffixes such as `.bin` and `.dat` are deliberately not assigned because extensions alone cannot identify their contents. `data` remains limited to recognized scientific/tabular dataset formats (and the existing `.sqlite`/`.sqlite3` mapping); `database` is separate and does not contribute to R-140's `DatasetShare`. New `data` entries do contribute, so R-140 remains a suffix-based heuristic rather than content detection.
+
 ## 3. Result on your manifest (MaxLeafBytes 20 GB, SigShare 0.10)
 
 64 chunks from 15,400 folders: 40 MIXED-LEAF, 6 BLOB, 6 WRAPPER, 5 CONTAINER, 3 OPAQUE-BULK, 3 PROJECT, 1 REPO. No fan-out violations. See `sample-classification-from-your-manifest.tsv`.
